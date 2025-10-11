@@ -167,6 +167,7 @@ export class LexicalEditor {
 }
 
 export function createEditor(editorConfig?: CreateEditorArgs): LexicalEditor {
+  // TODO: Continue here
   const editor = new LexicalEditor();
 
   return editor;
