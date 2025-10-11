@@ -37,3 +37,9 @@ export class ElementNode extends LexicalNode {
     this.__textStyle = '';
   }
 }
+
+export function $isElementNode(
+  node: LexicalNode | null | undefined,
+): node is ElementNode {
+  return node instanceof ElementNode;
+}
