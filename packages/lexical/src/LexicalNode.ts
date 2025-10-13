@@ -172,6 +172,24 @@ export type BaseStaticNodeConfig = {
 };
 
 /**
+ * Any StaticNodeConfigValue (for generics and collections)
+ */
+export type AnyStaticNodeConfigValue = StaticNodeConfigValue<any, any>;
+
+/**
+ * @internal
+ *
+ * This is the more specific type than BaseStaticNodeConfig that a subclass
+ * should return from $config()
+ */
+export type StaticNodeConfigRecord<
+  Type extends string,
+  Config extends AnyStaticNodeConfigValue,
+> = BaseStaticNodeConfig & {
+  readonly [K in Type]?: Config;
+};
+
+/**
  * Omit the children, type, and version properties from the given SerializedLexicalNode definition.
  */
 export type LexicalUpdateJSON<T extends SerializedLexicalNode> = Omit<
@@ -273,6 +291,21 @@ export class LexicalNode {
    */
   $config(): BaseStaticNodeConfig {
     return {};
+  }
+
+  /**
+   * This is a convenience method for $config that
+   * aids in type inference. See {@link LexicalNode.$config}
+   * for example usage.
+   */
+  config<Type extends string, Config extends StaticNodeConfigValue<this, Type>>(
+    type: Type,
+    config: Config,
+  ): StaticNodeConfigRecord<Type, Config> {
+    const parentKlass =
+      config.extends || Object.getPrototypeOf(this.constructor);
+    Object.assign(config, { extends: parentKlass, type });
+    return { [type]: config } as StaticNodeConfigRecord<Type, Config>;
   }
 
   static getType(): string {
