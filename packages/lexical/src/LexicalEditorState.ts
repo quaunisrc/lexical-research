@@ -1,5 +1,6 @@
 import type { NodeMap } from './LexicalNode';
 import type { BaseSelection } from './LexicalSelection';
+import { $createRootNode } from './nodes/LexicalRootNode';
 
 export class EditorState {
   _nodeMap: NodeMap;
@@ -13,4 +14,8 @@ export class EditorState {
     this._flushSync = false;
     this._readOnly = false;
   }
+}
+
+export function createEmptyEditorState(): EditorState {
+  return new EditorState(new Map([['root', $createRootNode()]]));
 }

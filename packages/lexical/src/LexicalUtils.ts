@@ -20,6 +20,7 @@ import {
   getActiveEditorState,
   internalGetActiveEditorState,
 } from './LexicalUpdates';
+import { RootNode } from './nodes/LexicalRootNode';
 
 let pendingNodeToClone: null | LexicalNode = null;
 export function setPendingNodeToClone(pendingNode: null | LexicalNode): void {
@@ -369,4 +370,19 @@ export function $setNodeKey(
   editor._cloneNotNeeded.add(key);
   editor._dirtyType = HAS_DIRTY_NODES;
   node.__key = key;
+}
+
+export function internalGetRoot(editorState: EditorState): RootNode {
+  return editorState._nodeMap.get('root') as RootNode;
+}
+
+export function $getRoot(): RootNode {
+  return internalGetRoot(getActiveEditorState());
+}
+
+export function createUID(): string {
+  return Math.random()
+    .toString(36)
+    .replace(/[^a-z]+/g, '')
+    .substring(0, 5);
 }

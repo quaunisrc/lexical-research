@@ -88,3 +88,7 @@ export function getActiveEditor(): LexicalEditor {
 export function internalGetActiveEditorState(): EditorState | null {
   return activeEditorState;
 }
+
+export function internalGetActiveEditor(): LexicalEditor | null {
+  return activeEditor;
+}

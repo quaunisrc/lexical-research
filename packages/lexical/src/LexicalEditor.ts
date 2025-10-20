@@ -1,4 +1,4 @@
-import type { EditorState } from './LexicalEditorState';
+import { createEmptyEditorState, type EditorState } from './LexicalEditorState';
 import {
   DOMConversionMap,
   DOMExportOutput,
@@ -7,6 +7,10 @@ import {
   NodeKey,
 } from './LexicalNode';
 import { SharedNodeState } from './LexicalNodeState';
+import { internalGetActiveEditor } from './LexicalUpdates';
+import { createUID } from './LexicalUtils';
+
+export type Spread<T1, T2> = Omit<T2, keyof T1> & T1;
 
 // https://github.com/microsoft/TypeScript/issues/3841
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -151,11 +155,19 @@ export type CreateEditorArgs = {
 
 type IntentionallyMarkedAsDirtyElement = boolean;
 
+export type EditorConfig = {
+  disableEvents?: boolean;
+  namespace: string;
+  theme: EditorThemeClasses;
+};
+
 export class LexicalEditor {
   static version: string | undefined;
 
   /** @internal */
   _nodes: RegisteredNodes;
+  /** @internal */
+  _config: EditorConfig;
   /** @internal */
   _dirtyType: 0 | 1 | 2;
   /** @internal */
@@ -167,7 +179,18 @@ export class LexicalEditor {
 }
 
 export function createEditor(editorConfig?: CreateEditorArgs): LexicalEditor {
-  // TODO: Continue here
+  const config = editorConfig || {};
+  const activeEditor = internalGetActiveEditor();
+  const theme = config.theme || {};
+  const parentEditor =
+    editorConfig === undefined ? activeEditor : config.parentEditor || null;
+  const disableEvents = config.disableEvents || false;
+  const editorState = createEmptyEditorState();
+  const namespace =
+    config.namespace ||
+    (parentEditor !== null ? parentEditor._config.namespace : createUID());
+  const initialEditorState = config.editorState;
+
   const editor = new LexicalEditor();
 
   return editor;

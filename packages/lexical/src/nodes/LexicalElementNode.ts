@@ -1,5 +1,32 @@
-import type { KlassConstructor } from '../LexicalEditor';
-import { LexicalNode, type NodeKey } from '../LexicalNode';
+import type { KlassConstructor, Spread } from '../LexicalEditor';
+import {
+  LexicalNode,
+  SerializedLexicalNode,
+  type NodeKey,
+} from '../LexicalNode';
+
+export type ElementFormatType =
+  | 'left'
+  | 'start'
+  | 'center'
+  | 'right'
+  | 'end'
+  | 'justify'
+  | '';
+
+export type SerializedElementNode<
+  T extends SerializedLexicalNode = SerializedLexicalNode,
+> = Spread<
+  {
+    children: Array<T>;
+    direction: 'ltr' | 'rtl' | null;
+    format: ElementFormatType;
+    indent: number;
+    textFormat?: number;
+    textStyle?: string;
+  },
+  SerializedLexicalNode
+>;
 
 /** @noInheritDoc */
 export class ElementNode extends LexicalNode {
