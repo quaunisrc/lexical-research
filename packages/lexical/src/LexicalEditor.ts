@@ -9,6 +9,12 @@ import {
 import { SharedNodeState } from './LexicalNodeState';
 import { internalGetActiveEditor } from './LexicalUpdates';
 import { createUID } from './LexicalUtils';
+import { ArtificialNode__DO_NOT_USE } from './nodes/ArtificialNode';
+import { LineBreakNode } from './nodes/LexicalLineBreakNode';
+import { ParagraphNode } from './nodes/LexicalParagraphNode';
+import { RootNode } from './nodes/LexicalRootNode';
+import { TabNode } from './nodes/LexicalTabNode';
+import { TextNode } from './nodes/LexicalTextNode';
 
 export type Spread<T1, T2> = Omit<T2, keyof T1> & T1;
 
@@ -190,6 +196,15 @@ export function createEditor(editorConfig?: CreateEditorArgs): LexicalEditor {
     config.namespace ||
     (parentEditor !== null ? parentEditor._config.namespace : createUID());
   const initialEditorState = config.editorState;
+  const nodes = [
+    RootNode,
+    TextNode,
+    LineBreakNode,
+    TabNode,
+    ParagraphNode,
+    ArtificialNode__DO_NOT_USE,
+    ...(config.nodes || []),
+  ];
 
   const editor = new LexicalEditor();
 
