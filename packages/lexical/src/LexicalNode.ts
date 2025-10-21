@@ -349,6 +349,10 @@ export class LexicalNode {
 
   static importDOM?: () => DOMConversionMap<any> | null;
 
+  static transform(): ((node: LexicalNode) => void) | null {
+    return null;
+  }
+
   /**
    * Returns the string type of this node.
    */

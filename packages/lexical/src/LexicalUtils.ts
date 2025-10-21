@@ -101,6 +101,13 @@ export function hasOwnStaticMethod(
   return hasOwn(klass, k) && klass[k] !== LexicalNode[k];
 }
 
+/**
+ * @internal
+ */
+export function hasOwnExportDOM(klass: Klass<LexicalNode>) {
+  return hasOwn(klass.prototype, 'exportDOM');
+}
+
 export function getStaticNodeConfig(klass: Klass<LexicalNode>): {
   ownNodeType: undefined | string;
   ownNodeConfig: undefined | StaticNodeConfigValue<LexicalNode, string>;

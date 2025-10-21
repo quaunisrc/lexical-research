@@ -5,7 +5,12 @@ import {
   SerializedLexicalNode,
 } from './LexicalNode';
 import { NODE_STATE_KEY } from './LexicalConstants';
-import { $getEditor, getRegisteredNodeOrThrow } from './LexicalUtils';
+import {
+  $getEditor,
+  getRegisteredNodeOrThrow,
+  getStaticNodeConfig,
+} from './LexicalUtils';
+import { LexicalNodeConfig } from './LexicalEditor';
 
 /**
  * @internal
@@ -515,4 +520,39 @@ export function $updateStateFromJSON<T extends LexicalNode>(
     $getWritableNodeState(node).updateFromJSON(parseState);
   }
   return writable;
+}
+
+/**
+ * @internal
+ *
+ * Create the state to store on RegisteredNode
+ */
+export function createSharedNodeState(
+  nodeConfig: LexicalNodeConfig,
+): SharedNodeState {
+  const sharedConfigMap = new Map<string, AnyStateConfig>();
+  const flatKeys = new Set<string>();
+  for (
+    let klass =
+      typeof nodeConfig === 'function' ? nodeConfig : nodeConfig.replace;
+    klass.prototype && klass.prototype.getType !== undefined;
+    klass = Object.getPrototypeOf(klass)
+  ) {
+    const { ownNodeConfig } = getStaticNodeConfig(klass);
+    if (ownNodeConfig && ownNodeConfig.stateConfigs) {
+      for (const requiredStateConfig of ownNodeConfig.stateConfigs) {
+        let stateConfig: AnyStateConfig;
+        if ('stateConfig' in requiredStateConfig) {
+          stateConfig = requiredStateConfig.stateConfig;
+          if (requiredStateConfig.flat) {
+            flatKeys.add(stateConfig.key);
+          }
+        } else {
+          stateConfig = requiredStateConfig;
+        }
+        sharedConfigMap.set(stateConfig.key, stateConfig);
+      }
+    }
+  }
+  return { flatKeys, sharedConfigMap };
 }
