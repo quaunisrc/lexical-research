@@ -66,6 +66,8 @@ export class TextNode extends LexicalNode {
     return $createTextNode().updateFromJSON(serializedNode);
   }
 
+  // TODO: static importDom is missing
+
   constructor(text: string = '', key?: NodeKey) {
     super(key);
     this.__text = text;
