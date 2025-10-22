@@ -22,7 +22,8 @@ import { ParagraphNode } from './nodes/LexicalParagraphNode';
 import { RootNode } from './nodes/LexicalRootNode';
 import { TabNode } from './nodes/LexicalTabNode';
 import { TextNode } from './nodes/LexicalTextNode';
-import { FULL_RECONCILE } from './LexicalConstants';
+import { FULL_RECONCILE, NO_DIRTY_NODES } from './LexicalConstants';
+import { UpdateTag } from './LexicalUpdateTags';
 
 export type Spread<T1, T2> = Omit<T2, keyof T1> & T1;
 
@@ -175,9 +176,140 @@ export type EditorConfig = {
   theme: EditorThemeClasses;
 };
 
+export type EditorUpdateOptions = {
+  /**
+   * A function to run once the update is complete. See also {@link $onUpdate}.
+   */
+  onUpdate?: () => void;
+  /**
+   * Setting this to true will suppress all node
+   * transforms for this update cycle.
+   * Useful for synchronizing updates in some cases.
+   */
+  skipTransforms?: true;
+  /**
+   * A tag to identify this update, in an update listener, for instance.
+   * See also {@link $addUpdateTag}.
+   */
+  tag?: UpdateTag | UpdateTag[];
+  /**
+   * If true, prevents this update from being batched, forcing it to
+   * run synchronously.
+   */
+  discrete?: true;
+  /** @internal */
+  event?: undefined | UIEvent | Event | null;
+};
+
+export type DecoratorListener<T = never> = (
+  decorator: Record<NodeKey, T>,
+) => void;
+
+export type NodeMutation = 'created' | 'updated' | 'destroyed';
+
+export type MutationListener = (
+  nodes: Map<NodeKey, NodeMutation>,
+  payload: {
+    updateTags: Set<string>;
+    dirtyLeaves: Set<string>;
+    prevEditorState: EditorState;
+  },
+) => void;
+
+export type MutationListeners = Map<MutationListener, Set<Klass<LexicalNode>>>;
+
+export type EditableListener = (editable: boolean) => void;
+
+export type RootListener = (
+  rootElement: null | HTMLElement,
+  prevRootElement: null | HTMLElement,
+) => void;
+
+export type TextContentListener = (text: string) => void;
+
+export type MutatedNodes = Map<Klass<LexicalNode>, Map<NodeKey, NodeMutation>>;
+
+/**
+ * The payload passed to an UpdateListener
+ */
+export interface UpdateListenerPayload {
+  /**
+   * A Map of NodeKeys of ElementNodes to a boolean that is true
+   * if the node was intentionally mutated ('unintentional' mutations
+   * are triggered when an indirect descendant is marked dirty)
+   */
+  dirtyElements: Map<NodeKey, IntentionallyMarkedAsDirtyElement>;
+  /**
+   * A Set of NodeKeys of all nodes that were marked dirty that
+   * do not inherit from ElementNode.
+   */
+  dirtyLeaves: Set<NodeKey>;
+  /**
+   * The new EditorState after all updates have been processed,
+   * equivalent to `editor.getEditorState()`
+   */
+  editorState: EditorState;
+  /**
+   * The Map of LexicalNode constructors to a `Map<NodeKey, NodeMutation>`,
+   * this is useful when you have a mutation listener type use cases that
+   * should apply to all or most nodes. Will be null if no DOM was mutated,
+   * such as when only the selection changed. Note that this will be empty
+   * unless at least one MutationListener is explicitly registered
+   * (any MutationListener is sufficient to compute the mutatedNodes Map
+   * for all nodes).
+   *
+   * Added in v0.28.0
+   */
+  mutatedNodes: null | MutatedNodes;
+  /**
+   * For advanced use cases only.
+   *
+   * Tracks the keys of TextNode descendants that have been merged
+   * with their siblings by normalization. Note that these keys may
+   * not exist in either editorState or prevEditorState and generally
+   * this is only used for conflict resolution edge cases in collab.
+   */
+  normalizedNodes: Set<NodeKey>;
+  /**
+   * The previous EditorState that is being discarded
+   */
+  prevEditorState: EditorState;
+  /**
+   * The set of tags added with update options or {@link $addUpdateTag},
+   * node that this includes all tags that were processed in this
+   * reconciliation which may have been added by separate updates.
+   */
+  tags: Set<string>;
+}
+
+export type UpdateListener = (payload: UpdateListenerPayload) => void;
+
+export interface Listeners {
+  decorator: Set<DecoratorListener<any>>;
+  mutation: MutationListeners;
+  editable: Set<EditableListener>;
+  root: Set<RootListener>;
+  textcontent: Set<TextContentListener>;
+  update: Set<UpdateListener>;
+}
+
+// TODO: Check why TPayload is unused
+export type LexicalCommand<TPayload> = {
+  type?: string;
+};
+
+export type CommandListener<P> = (payload: P, editor: LexicalEditor) => boolean;
+
+type Commands = Map<
+  LexicalCommand<unknown>,
+  Array<Set<CommandListener<unknown>>>
+>;
+
 export class LexicalEditor {
   static version: string | undefined;
 
+  /** @internal */
+  _headless: boolean;
   /** @internal */
   _parentEditor: null | LexicalEditor;
   /** @internal */
@@ -191,7 +323,21 @@ export class LexicalEditor {
   /** @internal */
   _deferred: Array<() => void>;
   /** @internal */
+  _keyToDOMMap: Map<NodeKey, HTMLElement>;
+  /** @internal */
+  _updates: Array<[() => void, EditorUpdateOptions | undefined]>;
+  /** @internal */
+  _updating: boolean;
+  /** @internal */
+  _listeners: Listeners;
+  /** @internal */
+  _commands: Commands;
+  /** @internal */
   _nodes: RegisteredNodes;
+  /** @internal */
+  _decorators: Record<NodeKey, unknown>;
+  /** @internal */
+  _pendingDecorators: null | Record<NodeKey, unknown>;
   /** @internal */
   _config: EditorConfig;
   /** @internal */
@@ -202,6 +348,24 @@ export class LexicalEditor {
   _dirtyLeaves: Set<NodeKey>;
   /** @internal */
   _dirtyElements: Map<NodeKey, IntentionallyMarkedAsDirtyElement>;
+  /** @internal */
+  _normalizedNodes: Set<NodeKey>;
+  /** @internal */
+  _updateTags: Set<UpdateTag>;
+  /** @internal */
+  _observer: null | MutationObserver;
+  /** @internal */
+  _key: string;
+  /** @internal */
+  _onError: ErrorHandler;
+  /** @internal */
+  _htmlConversions: DOMConversionCache;
+  /** @internal */
+  _window: null | Window;
+  /** @internal */
+  _editable: boolean;
+  /** @internal */
+  _blockCursorElement: null | HTMLDivElement;
   /** @internal */
   _createEditorArgs?: undefined | CreateEditorArgs;
 
@@ -227,7 +391,46 @@ export class LexicalEditor {
     // Used to help co-ordinate selection and events
     this._compositionKey = null;
     this._deferred = [];
-    // TODO: Continue here
+    // Used during reconciliation
+    this._keyToDOMMap = new Map();
+    this._updates = [];
+    this._updating = false;
+    // Listeners
+    this._listeners = {
+      decorator: new Set(),
+      editable: new Set(),
+      mutation: new Map(),
+      root: new Set(),
+      textcontent: new Set(),
+      update: new Set(),
+    };
+    // Commands
+    this._commands = new Map();
+    // Editor configuration for theme/context.
+    this._config = config;
+    // Mapping of types to their nodes
+    this._nodes = nodes;
+    // React node decorators for portals
+    this._decorators = {};
+    this._pendingDecorators = null;
+    // Used to optimize reconciliation
+    this._dirtyType = NO_DIRTY_NODES;
+    this._cloneNotNeeded = new Set();
+    this._dirtyLeaves = new Set();
+    this._dirtyElements = new Map();
+    this._normalizedNodes = new Set();
+    this._updateTags = new Set();
+    // Handling of DOM mutations
+    this._observer = null;
+    // Used for identifying owning editors
+    this._key = createUID();
+
+    this._onError = onError;
+    this._htmlConversions = htmlConversions;
+    this._editable = editable;
+    this._headless = parentEditor !== null && parentEditor._headless;
+    this._window = null;
+    this._blockCursorElement = null;
   }
 }
 
